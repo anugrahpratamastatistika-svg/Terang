@@ -1,0 +1,6 @@
+{
+  "name": "Terang",
+  "description": "Kalkulator transparansi biaya pinjaman mikro & UMKM sebelum tanda tangan. Tempel penawarannya, kami hitung biaya sebenarnya.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
