@@ -52,8 +52,9 @@ export function validasiPenawaran(p: Penawaran): string[] {
 
   const diterima = p.pokok - (p.potonganDimuka || 0);
   const totalBayar = p.cicilan * p.jumlahCicilan;
-  if (totalBayar <= diterima) {
-    errors.push('Penawaran ini tidak masuk akal. Cek lagi angkanya.');
+
+  if (totalBayar < diterima) {
+    errors.push('Total pembayaran lebih kecil daripada uang yang diterima. Periksa kembali angka cicilan, jumlah pembayaran, dan potongan.');
   }
 
   return errors;

@@ -1,3 +1,4 @@
+import { cekPeringatan } from '../lib/warning';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
@@ -124,6 +125,8 @@ const RevealContent: React.FC<RevealContentProps> = ({
     minimumFractionDigits: 1,
     maximumFractionDigits: 2,
   });
+
+  const daftarPeringatan = cekPeringatan(penawaran, hasil, tingkatRisiko);
 
   // Animation sequence state (Stage 1 to 4)
   const prefersReducedMotion =
@@ -331,6 +334,33 @@ const RevealContent: React.FC<RevealContentProps> = ({
 
       {/* Main Dynamic Animation & Presentation Stage */}
       <div className="flex flex-col gap-5 px-4 pt-3">
+        {/* Peringatan dini */}
+        {daftarPeringatan.length > 0 && (
+          <div className="flex flex-col gap-3">
+            <h2 className="text-base font-bold text-[#14213D]">
+              Hal yang perlu diperhatikan
+            </h2>
+
+            {daftarPeringatan.map((item, index) => {
+              const warna =
+                item.tingkat === 'bahaya'
+                  ? 'border-[#D62839] bg-red-50'
+                  : item.tingkat === 'waspada'
+                    ? 'border-[#FCA311] bg-amber-50'
+                    : 'border-[#E8DFC9] bg-[#FFFDF7]';
+
+              return (
+                <div key={index} className={`rounded-xl border-2 p-3 ${warna}`}>
+                  <p className="text-sm font-bold text-[#14213D]">{item.judul}</p>
+                  <p className="text-[13px] leading-snug text-[#1B1B1F]/85 mt-1">
+                    {item.keterangan}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {/* Animated Reveal Banner */}
         <div
           className={`relative rounded-[24px] transition-all duration-700 p-6 overflow-hidden border ${

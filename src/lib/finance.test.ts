@@ -346,7 +346,282 @@ describe('src/lib/finance.ts — Perhitungan Finansial Terang', () => {
     expect(resB.selisihBiayaPer100rb).toBeGreaterThan(0);
     expect(resB.penjelasan).toContain('Penawaran B lebih hemat');
 
-    // Kasus 3: Kedua penawaran hampir sama / identik proporsi biayanya
+      // Kasus uji WAJIB 3
+  it('Kasus Wajib 3: Input tidak valid menghasilkan error validasi', () => {
+    const errPokokNol = validasiPenawaran({
+      pokok: 0,
+      potonganDimuka: 0,
+      cicilan: 50000,
+      jumlahCicilan: 10,
+      frekuensi: 'harian',
+    });
+
+    expect(errPokokNol).toContain(
+      'Pokok pinjaman harus lebih besar dari 0.'
+    );
+
+    const errCicilanNegatif = validasiPenawaran({
+      pokok: 1000000,
+      potonganDimuka: 0,
+      cicilan: -50000,
+      jumlahCicilan: 10,
+      frekuensi: 'harian',
+    });
+
+    expect(errCicilanNegatif).toContain(
+      'Cicilan per kali bayar harus lebih besar dari 0.'
+    );
+
+    const errJumlahDesimal = validasiPenawaran({
+      pokok: 1000000,
+      potonganDimuka: 0,
+      cicilan: 50000,
+      jumlahCicilan: 10.5,
+      frekuensi: 'harian',
+    });
+
+    expect(errJumlahDesimal).toContain(
+      'Jumlah cicilan harus berupa bilangan bulat.'
+    );
+
+    const errPotonganLebih = validasiPenawaran({
+      pokok: 1000000,
+      potonganDimuka: 1000000,
+      cicilan: 50000,
+      jumlahCicilan: 10,
+      frekuensi: 'harian',
+    });
+
+    expect(errPotonganLebih).toContain(
+      'Potongan di muka tidak boleh sama dengan atau melebihi pokok pinjaman.'
+    );
+
+    const errTotalKurang = validasiPenawaran({
+      pokok: 1000000,
+      potonganDimuka: 0,
+      cicilan: 80000,
+      jumlahCicilan: 10,
+      frekuensi: 'harian',
+    });
+
+    expect(errTotalKurang).toContain(
+      'Total pembayaran lebih kecil daripada uang yang diterima. Periksa kembali angka cicilan, jumlah pembayaran, dan potongan.'
+    );
+
+    const errTotalSama = validasiPenawaran({
+      pokok: 1000000,
+      potonganDimuka: 0,
+      cicilan: 100000,
+      jumlahCicilan: 10,
+      frekuensi: 'harian',
+    });
+
+    expect(errTotalSama).toHaveLength(0);
+  });
+
+  // Kasus uji WAJIB 4
+  it('Kasus Wajib 4: simulasiTelat menghasilkan denda 50.000', () => {
+    const penawaran: Penawaran = {
+      pokok: 1000000,
+      potonganDimuka: 100000,
+      cicilan: 46000,
+      jumlahCicilan: 30,
+      frekuensi: 'harian',
+      dendaPerHari: 5000,
+    };
+
+    const hasilTelat = simulasiTelat(penawaran, 10);
+
+    expect(hasilTelat.denda).toBe(50000);
+    expect(hasilTelat.tambahanBiaya).toBe(50000);
+    expect(hasilTelat.totalBaru).toBe(1430000);
+  });
+
+  // Pengujian perbandingan dua penawaran
+  it('Membandingkan dua penawaran dan menentukan yang lebih murah', () => {
+    const penawaranA: Penawaran = {
+      pokok: 1000000,
+      potonganDimuka: 100000,
+      cicilan: 46000,
+      jumlahCicilan: 30,
+      frekuensi: 'harian',
+    };
+
+    const penawaranB: Penawaran = {
+      pokok: 1000000,
+      potonganDimuka: 0,
+      cicilan: 37000,
+      jumlahCicilan: 30,
+      frekuensi: 'harian',
+    };
+
+    const hasilKomparasi = bandingkan(penawaranA, penawaranB);
+
+    expect(hasilKomparasi.lebihMurah).toBe('b');
+    expect(hasilKomparasi.biayaPer100rbB).toBeLessThan(
+      hasilKomparasi.biayaPer100rbA
+    );
+    expect(hasilKomparasi.selisihBiayaPer100rb).toBeGreaterThan(0);
+    expect(hasilKomparasi.penjelasan).toContain(
+      'Penawaran B lebih hemat'
+    );
+  });
+
+  // Pengujian format
+  it('Format helper bekerja dengan benar', () => {
+    expect(formatRupiah(1380000)).toBe('Rp1.380.000');
+    expect(formatRupiah(0)).toBe('Rp0');
+    expect(formatRupiah(-50000)).toBe('-Rp50.000');
+
+    expect(formatPersen(0.03, 1)).toBe('3,0%');
+    expect(formatPersen(0.0301, 2)).toBe('3,01%');
+    expect(formatPersen(25.5, 1)).toBe('25,5%');
+  });
+
+  // Pengujian benchmark risiko OJK
+  it('Evaluasi risiko berdasarkan ambang BENCHMARK', () => {
+    expect(ambangOjk('produktif', 1000000, 30).batas).toBe(0.00275);
+    expect(ambangOjk('produktif', 50000000, 180).batas).toBe(0.00275);
+    expect(ambangOjk('produktif', 5000000, 181).batas).toBe(0.001);
+    expect(ambangOjk('produktif', 50000001, 30).batas).toBe(0.001);
+
+    expect(ambangOjk('konsumtif', 1000000, 30).batas).toBe(0.003);
+    expect(ambangOjk('konsumtif', 1000000, 181).batas).toBe(0.002);
+
+    expect(ambangOjk('produktif', 1000000, 179).tenorPendek).toBe(true);
+    expect(ambangOjk('produktif', 1000000, 181).tenorPendek).toBe(false);
+
+    const ambangProd = ambangOjk('produktif', 1000000, 30);
+
+    expect(ambangProd.amanMaks).toBe(ambangProd.batas / 2);
+    expect(ambangProd.waspadaMaks).toBe(ambangProd.batas);
+
+    const batas = 0.00275;
+
+    expect(tentukanRisiko(batas / 2 * 0.5, batas)).toBe('AMAN');
+    expect(tentukanRisiko(batas / 2, batas)).toBe('AMAN');
+    expect(tentukanRisiko(batas * 0.75, batas)).toBe('WASPADA');
+    expect(tentukanRisiko(batas, batas)).toBe('WASPADA');
+    expect(tentukanRisiko(batas * 1.01, batas)).toBe('BAHAYA');
+    expect(tentukanRisiko(batas * 2, batas)).toBe('BAHAYA');
+
+    expect(tentukanRisikoDariPenawaran(480000, 1000000, 30)).toBe('BAHAYA');
+    expect(tentukanRisikoDariPenawaran(280000, 5000000, 360)).toBe('AMAN');
+    expect(tentukanRisikoDariPenawaran(400000, 2000000, 56)).toBe('BAHAYA');
+    expect(tentukanRisikoDariPenawaran(60000, 1000000, 30)).toBe('WASPADA');
+    expect(tentukanRisikoDariPenawaran(30000, 1000000, 30, 'konsumtif')).toBe('AMAN');
+
+    expect(BENCHMARK.sumber).toBe('SEOJK No. 19/SEOJK.06/2025');
+    expect(translations.ID.aboutCategoryNote).toContain('SEOJK No. 19/SEOJK.06/2025');
+    expect(translations.EN.aboutCategoryNote).toContain('SEOJK No. 19/SEOJK.06/2025');
+
+    expect(RISK_CONFIG.WASPADA.shortDesc).toBe(
+      'Biaya harian di antara setengah batas dan batas OJK untuk pinjol berizin.'
+    );
+    expect(RISK_CONFIG.WASPADA.advice).toBe(
+      'Biaya harian di antara setengah batas dan batas OJK untuk pinjol berizin.'
+    );
+    expect(translations.ID.descWaspada).toBe(
+      'Biaya harian di antara setengah batas dan batas OJK untuk pinjol berizin.'
+    );
+    expect(translations.EN.descWaspada).toBe(
+      'Daily cost is between half of the limit and the OJK limit for licensed online lenders.'
+    );
+  });
+
+  // Pengujian batas denda OJK
+  it('Evaluasi batas denda keterlambatan OJK dengan cekDendaOjk', () => {
+    const hasil1 = cekDendaOjk(5000, 1000000, 0.00275);
+
+    expect(hasil1.persenPerHari).toBe(0.005);
+    expect(hasil1.melebihiBatas).toBe(true);
+    expect(formatPersenOjk(hasil1.persenPerHari)).toBe('0,5');
+
+    const hasil2 = cekDendaOjk(2000, 1000000, 0.00275);
+
+    expect(hasil2.persenPerHari).toBe(0.002);
+    expect(hasil2.melebihiBatas).toBe(false);
+    expect(formatPersenOjk(hasil2.persenPerHari)).toBe('0,2');
+
+    expect(() => cekDendaOjk(5000, 0, 0.00275)).not.toThrow();
+
+    const hasilPokokNol = cekDendaOjk(5000, 0, 0.00275);
+
+    expect(hasilPokokNol.persenPerHari).toBe(0);
+    expect(hasilPokokNol.melebihiBatas).toBe(false);
+  });
+
+  // Pengujian storage
+  it('Storage simpanCek, daftarCek, hapusCek, hapusSemua dengan skema terang.v2 dan bersihkanDataLama', () => {
+    expect(SCHEMA_KEY).toBe('terang.v2');
+    expect(LEGACY_SCHEMA_KEY).toBe('terang.v1');
+
+    expect(() => bersihkanDataLama()).not.toThrow();
+
+    hapusSemua();
+
+    expect(daftarCek().length).toBe(0);
+
+    const hasilContoh = hitungSemua(CONTOH_PENAWARAN);
+    const item = simpanCek(CONTOH_PENAWARAN, hasilContoh);
+
+    expect(item.id).toBeDefined();
+    expect(item.penawaran.pokok).toBe(1000000);
+    expect(item.penawaran.potonganDimuka).toBe(100000);
+    expect(item.hasil.diterima).toBe(900000);
+    expect(item.hasil.totalBayar).toBe(1380000);
+
+    const daftar = daftarCek();
+
+    expect(daftar.length).toBe(1);
+    expect(daftar[0].id).toBe(item.id);
+
+    hapusCek(item.id);
+
+    expect(daftarCek().length).toBe(0);
+
+    simpanCek(CONTOH_PENAWARAN, hasilContoh);
+    simpanCek(CONTOH_PENAWARAN, hasilContoh);
+
+    expect(daftarCek().length).toBe(2);
+
+    hapusSemua();
+
+    expect(daftarCek().length).toBe(0);
+  });
+
+  // Pengujian perbandingan dua penawaran
+  it('Fungsi bandingkan() mengevaluasi A lebih murah, B lebih murah, dan hampir sama', () => {
+    const penawaranMurah: Penawaran = {
+      pokok: 1000000,
+      potonganDimuka: 0,
+      cicilan: 110000,
+      jumlahCicilan: 10,
+      frekuensi: 'bulanan',
+    };
+
+    const penawaranMahal: Penawaran = {
+      pokok: 1000000,
+      potonganDimuka: 100000,
+      cicilan: 46000,
+      jumlahCicilan: 30,
+      frekuensi: 'harian',
+    };
+
+    const resA = bandingkan(penawaranMurah, penawaranMahal);
+
+    expect(resA.lebihMurah).toBe('a');
+    expect(resA.biayaPer100rbA).toBeLessThan(resA.biayaPer100rbB);
+    expect(resA.selisihBiayaPer100rb).toBeGreaterThan(0);
+    expect(resA.penjelasan).toContain('Penawaran A lebih hemat');
+
+    const resB = bandingkan(penawaranMahal, penawaranMurah);
+
+    expect(resB.lebihMurah).toBe('b');
+    expect(resB.biayaPer100rbB).toBeLessThan(resB.biayaPer100rbA);
+    expect(resB.selisihBiayaPer100rb).toBeGreaterThan(0);
+    expect(resB.penjelasan).toContain('Penawaran B lebih hemat');
+
     const penawaranSetara1: Penawaran = {
       pokok: 1000000,
       potonganDimuka: 0,
@@ -354,6 +629,7 @@ describe('src/lib/finance.ts — Perhitungan Finansial Terang', () => {
       jumlahCicilan: 10,
       frekuensi: 'bulanan',
     };
+
     const penawaranSetara2: Penawaran = {
       pokok: 2000000,
       potonganDimuka: 0,
@@ -363,8 +639,11 @@ describe('src/lib/finance.ts — Perhitungan Finansial Terang', () => {
     };
 
     const resSama = bandingkan(penawaranSetara1, penawaranSetara2);
+
     expect(resSama.lebihMurah).toBe('sama');
     expect(resSama.selisihBiayaPer100rb).toBeCloseTo(0, 2);
-    expect(resSama.penjelasan).toContain('Kedua penawaran memiliki beban biaya relatif yang seimbang');
+    expect(resSama.penjelasan).toContain(
+      'Kedua penawaran memiliki beban biaya relatif yang seimbang'
+    );
   });
 });
